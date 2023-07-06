@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "platform.h": "c",
+        "def.h": "c",
+        "riscv.h": "c",
+        "plic.h": "c",
+        "types.h": "c",
+        "os_kernel_dt.h": "c",
+        "os.h": "c",
+        "cpu_core.h": "c",
+        "compare": "c",
+        "type_traits": "c",
+        "cpu_def.h": "c",
+        "bsp.h": "c",
+        "os_cfg_app.h": "c",
+        "glob.h": "c"
+    }
+}
