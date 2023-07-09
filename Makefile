@@ -1,98 +1,151 @@
-SRC:=./
-BUILD:=./build
+SRC:= 	.
+BUILD:=	build
 
 PREFIX:=riscv32-unknown-linux-gnu-
 
+INCLUDE_PATH:= 	\
+$(SRC)/kernel	\
+$(SRC)/cpu		\
+$(SRC)/bsp		\
+$(SRC)/kernel/Cfg
+
+
+
+CC:=$(PREFIX)gcc
+CCFLAGS:= 				\
+-ffreestanding			\
+-nostdlib				\
+-nostdinc				\
+-fno-stack-protector	\
+-O0 -ggdb				\
+-march=rv32gc			\
+$(foreach it,$(INCLUDE_PATH),-I$(it))
+
+LD:=$(PREFIX)ld
+
+OBJDUMP:=$(PREFIX)objdump
+
+NM:=$(PREFIX)nm
 
 QEMU:=qemu-system-riscv32
-QEMUFLAGS:= \
--smp 1\
--bios none\
--m  512M\
--nographic\
+QEMUFLAGS:=	\
+-bios none	\
+-smp  1		\
+-m    512M	\
+-nographic	\
 -machine virt
 
-CC:= $(PREFIX)gcc
-LD:= $(PREFIX)ld
-CCFLAGS:=\
--ffreestanding\
--nostdlib\
--nostdinc\
--fno-stack-protector\
--O0 -ggdb\
--march=rv32gc\
--I./kernel\
--I./cpu\
--I./bsp\
--I./kernel/Cfg
 
-OBJECTS:= \
-$(BUILD)/bsp/boot.o\
-$(BUILD)/bsp/trap.o\
-$(BUILD)/bsp/riscv.o\
-$(BUILD)/bsp/bsp_init.o\
-$(BUILD)/bsp/string.o\
-$(BUILD)/bsp/uart.o\
-$(BUILD)/bsp/string.o\
-$(BUILD)/cpu/cpu_a.o\
-$(BUILD)/cpu/cpu_core.o\
-$(BUILD)/cpu/os_cpu_a.o\
-$(BUILD)/cpu/os_cpu_c.o\
-$(BUILD)/kernel/os_sem.o\
-$(BUILD)/kernel/os_mem.o\
-$(BUILD)/kernel/os_stat.o\
-$(BUILD)/kernel/os_cfg_app.o\
-$(BUILD)/kernel/os_msg.o\
-$(BUILD)/kernel/os_task.o\
-$(BUILD)/kernel/os_var.o\
-$(BUILD)/kernel/os_core.o\
-$(BUILD)/kernel/os_mutex.o\
-$(BUILD)/kernel/os_tick.o\
-$(BUILD)/kernel/os_dbg.o\
-$(BUILD)/kernel/os_prio.o\
-$(BUILD)/kernel/os_time.o\
-$(BUILD)/kernel/os_flag.o\
-$(BUILD)/kernel/os_q.o\
-$(BUILD)/kernel/os_tmr.o\
-$(BUILD)/main.o
+SRFILES:= 						\
+$(SRC)/bsp/boot.s				\
+$(SRC)/bsp/bsp_init.c			\
+$(SRC)/bsp/uart.c				\
+$(SRC)/bsp/string.c				\
+$(SRC)/bsp/riscv.c				\
+$(SRC)/bsp/trap.s				\
+$(SRC)/cpu/cpu_a.S				\
+$(SRC)/cpu/cpu_core.c 			\
+$(SRC)/cpu/os_cpu_a.S			\
+$(SRC)/cpu/os_cpu_c.c			\
+$(SRC)/kernel/os_sem.c 			\
+$(SRC)/kernel/os_mem.c			\
+$(SRC)/kernel/os_stat.c			\
+$(SRC)/kernel/os_cfg_app.c		\
+$(SRC)/kernel/os_msg.c			\
+$(SRC)/kernel/os_task.c			\
+$(SRC)/kernel/os_var.c			\
+$(SRC)/kernel/os_core.c			\
+$(SRC)/kernel/os_mutex.c		\
+$(SRC)/kernel/os_tick.c			\
+$(SRC)/kernel/os_dbg.c			\
+$(SRC)/kernel/os_prio.c			\
+$(SRC)/kernel/os_time.c			\
+$(SRC)/kernel/os_flag.c			\
+$(SRC)/kernel/os_q.c			\
+$(SRC)/kernel/os_tmr.c			\
+$(SRC)/kernel/Cfg/os_app_hooks.c\
+$(SRC)/main.c
 
-compile: $(BUILD)/kernel.bin
+OBJECTS:= $(patsubst $(SRC)/bsp/%.s,$(BUILD)/bsp/%.o,$(SRFILES))
+OBJECTS:= $(patsubst $(SRC)/bsp/%.c,$(BUILD)/bsp/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/cpu/%.S,$(BUILD)/cpu/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/cpu/%.c,$(BUILD)/cpu/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/kernel/%.S,$(BUILD)/kernel/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/kernel/%.c,$(BUILD)/kernel/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/kernel/Cfg/%.S,$(BUILD)/kernel/Cfg/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/kernel/Cfg/%.c,$(BUILD)/kernel/Cfg/%.o,$(OBJECTS))
+OBJECTS:= $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(OBJECTS))
+
+DEBUGFILES:=\
+$(shell find $(SRC) -name "*.c")\
+$(shell find $(SRC) -name "*.s")\
+$(shell find $(SRC) -name "*.S")
 
 
-qemu:$(BUILD)/kernel.bin
+compile:$(BUILD)/kernel.elf\
+		$(BUILD)/kernel.asm\
+		$(BUILD)/kernel.map
+
+qemu:$(BUILD)/kernel.elf\
+	 $(BUILD)/kernel.asm\
+	 $(BUILD)/kernel.map
 	$(QEMU) $(QEMUFLAGS) -kernel $< 
 
-qemuDbg:$(BUILD)/kernel.bin
-	$(QEMU) $(QEMUFLAGS) -kernel $< -s -S
-$(BUILD)/kernel.bin:$(OBJECTS)
-	$(shell mkdir -p $(dir $@))
-	$(LD) -T kernel.ld $^  -o $@
+qemuDbg:$(BUILD)/kernel.elf\
+	 	$(BUILD)/kernel.asm\
+		$(BUILD)/kernel.map
+	$(QEMU) $(QEMUFLAGS) -kernel $< -s -S 
 
-$(BUILD)/bsp/%.o: $(SRC)/bsp/%.c
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+$(BUILD)/kernel.asm:$(BUILD)/kernel.elf
+	@mkdir -p $(dir $@)
+	$(OBJDUMP) -d $< > $@
+
+$(BUILD)/kernel.map:$(BUILD)/kernel.elf
+	@mkdir -p $(dir $@)
+	$(NM)  $<  |sort >$@
+
+$(BUILD)/kernel.elf:$(SRC)/kernel.ld $(OBJECTS)
+	@mkdir -p $(dir $@)
+	$(LD) -T $< $(OBJECTS) -o $@
+
+$(BUILD)/bsp/%.o:$(SRC)/bsp/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
 $(BUILD)/bsp/%.o:$(SRC)/bsp/%.s
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
-$(BUILD)/cpu/%.o: $(SRC)/cpu/%.c
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+$(BUILD)/cpu/%.o:$(SRC)/cpu/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
+$(BUILD)/cpu/%.o:$(SRC)/cpu/%.S
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
-$(BUILD)/cpu/%.o: $(SRC)/cpu/%.S
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+$(BUILD)/kernel/%.o:$(SRC)/kernel/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
-$(BUILD)/kernel/%.o: $(SRC)/kernel/%.c
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+$(BUILD)/kernel/%.o:$(SRC)/kernel/%.S
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 
-$(BUILD)/%.o: $(SRC)/%.c
-	$(shell mkdir -p $(dir $@) )
-	$(CC) -c $(CCFLAGS) $< -o $@
+$(BUILD)/kernel/Cfg/%.o:$(SRC)/kernel/Cfg/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
+
+$(BUILD)/kernel/Cfg/%.o:$(SRC)/kernel/Cfg/%.S
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
+
+$(BUILD)/%.o:$(SRC)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CCFLAGS) -c $^ -o $@
 	
-.PHONY: clean
 clean:
 	rm -rf $(BUILD)
+debug:
+	@echo $(CCFLAGS) 
+.PHONY:clean debug compile qemu qemuDbg
