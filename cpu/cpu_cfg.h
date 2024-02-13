@@ -95,7 +95,7 @@
 
                                                                 /* Configure CPU timestamp timer word size ...          */
                                                                 /* ... (see Note #2) :                                  */
-#define  CPU_CFG_TS_TMR_SIZE                    CPU_WORD_SIZE_32
+#define  CPU_CFG_TS_TMR_SIZE                    CPU_WORD_SIZE_64
 
 
 /*
@@ -176,7 +176,7 @@
 */
 
 #if 0
-#define  CPU_CFG_ENDIAN_TYPE            CPU_ENDIAN_TYPE_BIG     /* Defines CPU data    word-memory order (see Note #2). */
+#define  CPU_CFG_ENDIAN_TYPE            CPU_ENDIAN_TYPE_LITTLE     /* Defines CPU data    word-memory order (see Note #2). */
 #endif
 
 

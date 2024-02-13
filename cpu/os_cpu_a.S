@@ -20,7 +20,7 @@
 # File      : os_cpu_a.S
 # Version   : V3.08.02
 #********************************************************************************************************
-# For       : RISC-V RV32
+# For       : RISC-V RV64
 # Toolchain : GNU C Compiler
 #********************************************************************************************************
 # Note(s)   : Hardware FP is not supported.
@@ -53,9 +53,7 @@
 
     .equ  RISCV_MIE_MSIE,            0x08            # M Soft Interrupt bit
 
-    .equ  RISCV_PRCI_BASE_ADDR,      0x44000000
-
-    .equ  RISCV32_SIE_BIT,           0x2
+    .equ  RISCV64_SIE_BIT,           0x2
 
 #********************************************************************************************************
 #                                     CODE GENERATION DIRECTIVES
@@ -92,45 +90,45 @@ OSStartHighRdy:
 
 # SWITCH TO HIGHEST PRIORITY TASK
     la     t0, OSTCBHighRdyPtr
-    lw     t1, 0(t0)
-    lw     sp, 0(t1)
+    ld     t1, 0(t0)
+    ld     sp, 0(t1)
 
 # Retrieve the location where to jump
-    lw     t0, 31 * 4(sp)
+    ld     t0, 31 * 8(sp)
     csrw   mepc, t0
 
 # Restore x1 to x31 registers
-    lw     ra,   0 * 4(sp)
-    lw     t0,   4 * 4(sp)
-    lw     t1,   5 * 4(sp)
-    lw     t2,   6 * 4(sp)
-    lw     s0,   7 * 4(sp)
-    lw     s1,   8 * 4(sp)
-    lw     a0,   9 * 4(sp)
-    lw     a1,  10 * 4(sp)
-    lw     a2,  11 * 4(sp)
-    lw     a3,  12 * 4(sp)
-    lw     a4,  13 * 4(sp)
-    lw     a5,  14 * 4(sp)
-    lw     a6,  15 * 4(sp)
-    lw     a7,  16 * 4(sp)
-    lw     s2,  17 * 4(sp)
-    lw     s3,  18 * 4(sp)
-    lw     s4,  19 * 4(sp)
-    lw     s5,  20 * 4(sp)
-    lw     s6,  21 * 4(sp)
-    lw     s7,  22 * 4(sp)
-    lw     s8,  23 * 4(sp)
-    lw     s9,  24 * 4(sp)
-    lw     s10, 25 * 4(sp)
-    lw     s11, 26 * 4(sp)
-    lw     t3,  27 * 4(sp)
-    lw     t4,  28 * 4(sp)
-    lw     t5,  29 * 4(sp)
-    lw     t6,  30 * 4(sp)
+    ld     ra,   0 * 8(sp)
+    ld     t0,   4 * 8(sp)
+    ld     t1,   5 * 8(sp)
+    ld     t2,   6 * 8(sp)
+    ld     s0,   7 * 8(sp)
+    ld     s1,   8 * 8(sp)
+    ld     a0,   9 * 8(sp)
+    ld     a1,  10 * 8(sp)
+    ld     a2,  11 * 8(sp)
+    ld     a3,  12 * 8(sp)
+    ld     a4,  13 * 8(sp)
+    ld     a5,  14 * 8(sp)
+    ld     a6,  15 * 8(sp)
+    ld     a7,  16 * 8(sp)
+    ld     s2,  17 * 8(sp)
+    ld     s3,  18 * 8(sp)
+    ld     s4,  19 * 8(sp)
+    ld     s5,  20 * 8(sp)
+    ld     s6,  21 * 8(sp)
+    ld     s7,  22 * 8(sp)
+    ld     s8,  23 * 8(sp)
+    ld     s9,  24 * 8(sp)
+    ld     s10, 25 * 8(sp)
+    ld     s11, 26 * 8(sp)
+    ld     t3,  27 * 8(sp)
+    ld     t4,  28 * 8(sp)
+    ld     t5,  29 * 8(sp)
+    ld     t6,  30 * 8(sp)
 
 # Compensate for the stack pointer
-    addi   sp, sp, 32 * 4
+    addi   sp, sp, 32 * 8
 
 # Use register t6 to jump to HIGHEST priority
     csrr   t6, mepc
@@ -162,7 +160,7 @@ OSIntCtxSw:
     csrrs  zero, mie, t0
 
 # This will trigger a synchronous software interrupt; PRCI->MSIP[0] = 0x01;
-    li     t0, RISCV32_SIE_BIT
+    li     t0, RISCV64_SIE_BIT
     csrw   mip,t0
     ret
 
@@ -198,14 +196,14 @@ Software_IRQHandler:
     csrrc  zero, mstatus, t0
 
 # Clear soft interrupt for hart0, PRCI->MSIP[0] = 0x00;
-    li     t0, RISCV32_SIE_BIT
+    li     t0, RISCV64_SIE_BIT
     csrrc zero,mip,t0
 
 # Stack pointer was passed by 'entry.s' in register a2.
 # OSTCBCurPtr->StkPtr = SP;
     la     t0, OSTCBCurPtr
-    lw     t1, 0(t0)
-    sw     a2, 0(t1)
+    ld     t1, 0(t0)
+    sd     a2, 0(t1)
 
 # Execute OS task switch hook.
     jal    OSTaskSwHook
@@ -218,48 +216,48 @@ Software_IRQHandler:
 
 # OSTCBCurPtr = OSTCBHighRdyPtr;
     la     t0, OSTCBHighRdyPtr
-    lw     t1, 0(t0)
+    ld     t1, 0(t0)
     la     t0, OSTCBCurPtr
-    sw     t1, 0(t0)
+    sd     t1, 0(t0)
 
 # SP = OSTCBHighRdyPtr->StkPtr;
-    lw     sp, 0(t1)
+    ld     sp, 0(t1)
 
 # Retrieve the address at which exception happened
-    lw     t0, 31 * 4(sp)
+    ld     t0, 31 * 8(sp)
     csrw   mepc, t0
 
 # Restore x1 to x31 registers
-    lw     ra,   0 * 4(sp)
-    lw     t0,   4 * 4(sp)
-    lw     t1,   5 * 4(sp)
-    lw     t2,   6 * 4(sp)
-    lw     s0,   7 * 4(sp)
-    lw     s1,   8 * 4(sp)
-    lw     a0,   9 * 4(sp)
-    lw     a1,  10 * 4(sp)
-    lw     a2,  11 * 4(sp)
-    lw     a3,  12 * 4(sp)
-    lw     a4,  13 * 4(sp)
-    lw     a5,  14 * 4(sp)
-    lw     a6,  15 * 4(sp)
-    lw     a7,  16 * 4(sp)
-    lw     s2,  17 * 4(sp)
-    lw     s3,  18 * 4(sp)
-    lw     s4,  19 * 4(sp)
-    lw     s5,  20 * 4(sp)
-    lw     s6,  21 * 4(sp)
-    lw     s7,  22 * 4(sp)
-    lw     s8,  23 * 4(sp)
-    lw     s9,  24 * 4(sp)
-    lw     s10, 25 * 4(sp)
-    lw     s11, 26 * 4(sp)
-    lw     t3,  27 * 4(sp)
-    lw     t4,  28 * 4(sp)
-    lw     t5,  29 * 4(sp)
-    lw     t6,  30 * 4(sp)
+    ld     ra,   0 * 8(sp)
+    ld     t0,   4 * 8(sp)
+    ld     t1,   5 * 8(sp)
+    ld     t2,   6 * 8(sp)
+    ld     s0,   7 * 8(sp)
+    ld     s1,   8 * 8(sp)
+    ld     a0,   9 * 8(sp)
+    ld     a1,  10 * 8(sp)
+    ld     a2,  11 * 8(sp)
+    ld     a3,  12 * 8(sp)
+    ld     a4,  13 * 8(sp)
+    ld     a5,  14 * 8(sp)
+    ld     a6,  15 * 8(sp)
+    ld     a7,  16 * 8(sp)
+    ld     s2,  17 * 8(sp)
+    ld     s3,  18 * 8(sp)
+    ld     s4,  19 * 8(sp)
+    ld     s5,  20 * 8(sp)
+    ld     s6,  21 * 8(sp)
+    ld     s7,  22 * 8(sp)
+    ld     s8,  23 * 8(sp)
+    ld     s9,  24 * 8(sp)
+    ld     s10, 25 * 8(sp)
+    ld     s11, 26 * 8(sp)
+    ld     t3,  27 * 8(sp)
+    ld     t4,  28 * 8(sp)
+    ld     t5,  29 * 8(sp)
+    ld     t6,  30 * 8(sp)
 
-    addi   sp, sp, 4 * 32
+    addi   sp, sp, 8 * 32
 
 # Exception return will restore remaining context
     mret

@@ -1,4 +1,3 @@
-
 .section .text
 .align 4
 .extern ks_stack
@@ -16,3 +15,4 @@ _start:
     j bsp_init
 spin:
     j spin
+    

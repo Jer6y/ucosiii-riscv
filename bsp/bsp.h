@@ -1,6 +1,8 @@
 #ifndef BSP_H
 #define BSP_H
 
+#include <stdarg.h>
+
 #define NULL  0
 #define false 0
 #define true  1
@@ -42,10 +44,10 @@ typedef unsigned long long  uint64;
 #define write_reg(r,val,type) (*(type *)Reg((r))=(type)(val))
 #define read_reg(r,type) (*(type *)Reg((r)))
 
-#define va_list(base) ((uint64*)(base)+1)
-#define va_end(t)     ((t)= 0)
-#define va_next(t,type) ( *(type *)((va*)((t)=(va*)(t)+1)-1))
-typedef unsigned long long va;
+// #define va_list(base) ((uint64*)(base)+1)
+// #define va_end(t)     ((t)= 0)
+// #define va_next(t,type) ( *(type *)((va*)((t)=(va*)(t)+1)-1))
+// typedef unsigned long long va;
 
 #ifndef PLATFORM_H
 #define PLATFORM_H
@@ -60,16 +62,13 @@ typedef unsigned long long va;
 #define PAGESIZE        (4096)
 //物理地址结束的地方                    闭区间
 #define RAM_END         ((KERNEL_BASE+128*1024*1024)-1)
-//串口                                 IO地址
-#define UART_START      0x10000000u
 //时钟                                 IO地址
-#define CLINT_START     0x2000000u
+#define CLINT_START     0x2000000ull
 //中断管理设备                          IO地址
-#define PLIC_START      0xc000000u
-//TRAPFRAM地址
-#define TRAPFRAME       0x3ffffff000u 
+#define PLIC_START      0x0c000000ull
 //总页数
 #define TOTALPAGES      ((128*1024*1024)/4096)
+
 #endif
 
 #define SIE  (1u<<1)
@@ -133,54 +132,54 @@ void uart_init();                //串口初始化
 void uart_putc_sync(char c);    //同步输送字符
 
 void sfence();              //读riscv-csr的c描述的函数
-uint32 r_int();
-uint32 r_tp();
-uint32 r_sip();
-uint32 r_mip();
-uint32 r_sie();
-uint32 r_mie();
-uint32 r_satp();
-uint32 r_sepc();
-uint32 r_mepc();
-uint32 r_stval();
-uint32 r_mtval();
-uint32 r_stvec();
-uint32 r_mtvec();
-uint32 r_scause();
-uint32 r_mcause();
-uint32 r_sstatus();
-uint32 r_mstatus();
-uint32 r_mhartid();
-uint32 r_mideleg();
-uint32 r_medeleg();
-uint32 r_sscratch();
-uint32 r_mscratch();
+uint64 r_int();
+uint64 r_tp();
+uint64 r_sip();
+uint64 r_mip();
+uint64 r_sie();
+uint64 r_mie();
+uint64 r_satp();
+uint64 r_sepc();
+uint64 r_mepc();
+uint64 r_stval();
+uint64 r_mtval();
+uint64 r_stvec();
+uint64 r_mtvec();
+uint64 r_scause();
+uint64 r_mcause();
+uint64 r_sstatus();
+uint64 r_mstatus();
+uint64 r_mhartid();
+uint64 r_mideleg();
+uint64 r_medeleg();
+uint64 r_sscratch();
+uint64 r_mscratch();
 void w_int_on();            //写riscv-csr的c描述的函数          
 void w_int_off();
-void w_tp(uint32 x);
-void w_sip(uint32 x);
-void w_mip(uint32 x);
-void w_sie(uint32 x);
-void w_mie(uint32 x);
-void w_satp(uint32 x);
-void w_sepc(uint32 x);
-void w_mepc(uint32 x);
-void w_stval(uint32 x);
-void w_mtval(uint32 x);
-void w_stvec(uint32 x);
-void w_mtvec(uint32 x);
-void w_scause(uint32 x);
-void w_mcause(uint32 x);
-void w_sstatus(uint32 x);
-void w_mstatus(uint32 x);
+void w_tp(uint64 x);
+void w_sip(uint64 x);
+void w_mip(uint64 x);
+void w_sie(uint64 x);
+void w_mie(uint64 x);
+void w_satp(uint64 x);
+void w_sepc(uint64 x);
+void w_mepc(uint64 x);
+void w_stval(uint64 x);
+void w_mtval(uint64 x);
+void w_stvec(uint64 x);
+void w_mtvec(uint64 x);
+void w_scause(uint64 x);
+void w_mcause(uint64 x);
+void w_sstatus(uint64 x);
+void w_mstatus(uint64 x);
 // hartid 为只读 是不允许写的!
 // void w_mhartid(uint32 x);
-void w_mideleg(uint32 x);
-void w_medeleg(uint32 x);
-void w_sscratch(uint32 x);
-void w_mscratch(uint32 x);
-void w_pmpaddr0(uint32 x);
-void w_pmpcfg0(uint32 x);
+void w_mideleg(uint64 x);
+void w_medeleg(uint64 x);
+void w_sscratch(uint64 x);
+void w_mscratch(uint64 x);
+void w_pmpaddr0(uint64 x);
+void w_pmpcfg0(uint64 x);
 //string.c
 void *memset(const void *des, uint8 c,size_t n);
 void *memchr(const void *str, int c, size_t n);
@@ -196,11 +195,11 @@ size_t  strlen(const char * src);
 // 以下的buf或者str都不应该超过256个字符 否则引发panic
 int printf(const char* str,...);
 int sprintf(char *buf, const char *fmt, ...);
-int vsprintf(char *buf, const char *fmt, va* args);
+int __vsprintf(char *buf, const char *fmt, va_list args);
 void panic(char *str);
 void assert_fail(char* file,int line);
 #define assert(x) if(!(x)) { assert_fail(__FILE__,__LINE__); }
 void bsp_init();
-void trap_handler(uint32 mcause,uint32 mtval,uint32 sp);
+void trap_handler(uint64 mcause,uint64 mtval,uint64 sp);
 
 #endif

@@ -308,41 +308,41 @@ CPU_STK  *OSTaskStkInit (OS_TASK_PTR    p_task,
 
     *(--p_stk) = (CPU_STK) p_task;             /* Entry Point                                          */
 
-    *(--p_stk) = (CPU_STK) 0x31313131uL;       /* t6                                                   */
-    *(--p_stk) = (CPU_STK) 0x30303030uL;       /* t5                                                   */
-    *(--p_stk) = (CPU_STK) 0x29292929uL;       /* t4                                                   */
-    *(--p_stk) = (CPU_STK) 0x28282828uL;       /* t3                                                   */
+    *(--p_stk) = (CPU_STK) 0x31313131ull;       /* t6                                                   */
+    *(--p_stk) = (CPU_STK) 0x30303030ull;       /* t5                                                   */
+    *(--p_stk) = (CPU_STK) 0x29292929ull;       /* t4                                                   */
+    *(--p_stk) = (CPU_STK) 0x28282828ull;       /* t3                                                   */
                                                /* Saved Registers                                      */
-    *(--p_stk) = (CPU_STK) 0x27272727uL;       /* s11                                                  */
-    *(--p_stk) = (CPU_STK) 0x26262626uL;       /* s10                                                  */
-    *(--p_stk) = (CPU_STK) 0x25252525uL;       /* s9                                                   */
-    *(--p_stk) = (CPU_STK) 0x24242424uL;       /* s8                                                   */
-    *(--p_stk) = (CPU_STK) 0x23232323uL;       /* s7                                                   */
-    *(--p_stk) = (CPU_STK) 0x22222222uL;       /* s6                                                   */
-    *(--p_stk) = (CPU_STK) 0x21212121uL;       /* s5                                                   */
-    *(--p_stk) = (CPU_STK) 0x20202020uL;       /* s4                                                   */
-    *(--p_stk) = (CPU_STK) 0x19191919uL;       /* s3                                                   */
-    *(--p_stk) = (CPU_STK) 0x18181818uL;       /* s2                                                   */
+    *(--p_stk) = (CPU_STK) 0x27272727ull;       /* s11                                                  */
+    *(--p_stk) = (CPU_STK) 0x26262626ull;       /* s10                                                  */
+    *(--p_stk) = (CPU_STK) 0x25252525ull;       /* s9                                                   */
+    *(--p_stk) = (CPU_STK) 0x24242424ull;       /* s8                                                   */
+    *(--p_stk) = (CPU_STK) 0x23232323ull;       /* s7                                                   */
+    *(--p_stk) = (CPU_STK) 0x22222222ull;       /* s6                                                   */
+    *(--p_stk) = (CPU_STK) 0x21212121ull;       /* s5                                                   */
+    *(--p_stk) = (CPU_STK) 0x20202020ull;       /* s4                                                   */
+    *(--p_stk) = (CPU_STK) 0x19191919ull;       /* s3                                                   */
+    *(--p_stk) = (CPU_STK) 0x18181818ull;       /* s2                                                   */
                                                /* Function Arguments                                   */
-    *(--p_stk) = (CPU_STK) 0x17171717uL;       /* a7                                                   */
-    *(--p_stk) = (CPU_STK) 0x16161616uL;       /* a6                                                   */
-    *(--p_stk) = (CPU_STK) 0x15151515uL;       /* a5                                                   */
-    *(--p_stk) = (CPU_STK) 0x14141414uL;       /* a4                                                   */
-    *(--p_stk) = (CPU_STK) 0x13131313uL;       /* a3                                                   */
-    *(--p_stk) = (CPU_STK) 0x12121212uL;       /* a2                                                   */
+    *(--p_stk) = (CPU_STK) 0x17171717ull;       /* a7                                                   */
+    *(--p_stk) = (CPU_STK) 0x16161616ull;       /* a6                                                   */
+    *(--p_stk) = (CPU_STK) 0x15151515ull;       /* a5                                                   */
+    *(--p_stk) = (CPU_STK) 0x14141414ull;       /* a4                                                   */
+    *(--p_stk) = (CPU_STK) 0x13131313ull;       /* a3                                                   */
+    *(--p_stk) = (CPU_STK) 0x12121212ull;       /* a2                                                   */
                                                /* Function Arguments/return values                     */
-    *(--p_stk) = (CPU_STK) 0x11111111uL;       /* a1                                                   */
+    *(--p_stk) = (CPU_STK) 0x11111111ull;       /* a1                                                   */
     *(--p_stk) = (CPU_STK) p_arg;              /* a0                                                   */
-    *(--p_stk) = (CPU_STK) 0x09090909uL;       /* s1   : Saved register                                */
-    *(--p_stk) = (CPU_STK) 0x08080808uL;       /* s0/fp: Saved register/Frame pointer                  */
+    *(--p_stk) = (CPU_STK) 0x09090909ull;       /* s1   : Saved register                                */
+    *(--p_stk) = (CPU_STK) 0x08080808ull;       /* s0/fp: Saved register/Frame pointer                  */
                                                /* Temporary registers                                  */
-    *(--p_stk) = (CPU_STK) 0x07070707uL;       /* t2                                                   */
-    *(--p_stk) = (CPU_STK) 0x06060606uL;       /* t1                                                   */
-    *(--p_stk) = (CPU_STK) 0x05050505uL;       /* t0                                                   */
+    *(--p_stk) = (CPU_STK) 0x07070707ull;       /* t2                                                   */
+    *(--p_stk) = (CPU_STK) 0x06060606ull;       /* t1                                                   */
+    *(--p_stk) = (CPU_STK) 0x05050505ull;       /* t0                                                   */
 
-    *(--p_stk) = (CPU_STK) 0x04040404uL;       /* tp: Thread pointer                                   */
-    *(--p_stk) = (CPU_STK) 0x03030303uL;       /* gp: Global pointer                                   */
-    *(--p_stk) = (CPU_STK) 0x02020202uL;       /* sp: Stack  pointer                                   */
+    *(--p_stk) = (CPU_STK) 0x04040404ull;       /* tp: Thread pointer                                   */
+    *(--p_stk) = (CPU_STK) 0x03030303ull;       /* gp: Global pointer                                   */
+    *(--p_stk) = (CPU_STK) 0x02020202ull;       /* sp: Stack  pointer                                   */
     *(--p_stk) = (CPU_STK) OS_TaskReturn;      /* ra: return address                                   */
 
     return (p_stk);

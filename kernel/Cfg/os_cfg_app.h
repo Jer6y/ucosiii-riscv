@@ -34,7 +34,7 @@
 */
                                                                 /* ------------------ MISCELLANEOUS ------------------- */
                                                                 /* Stack size of ISR stack (number of CPU_STK elements) */
-#define  OS_CFG_ISR_STK_SIZE                             128u
+#define  OS_CFG_ISR_STK_SIZE                             2048u
                                                                 /* Maximum number of messages                           */
 #define  OS_CFG_MSG_POOL_SIZE                             32u
                                                                 /* Stack limit position in percentage to empty          */
@@ -43,7 +43,7 @@
 
                                                                 /* -------------------- IDLE TASK --------------------- */
                                                                 /* Stack size (number of CPU_STK elements)              */
-#define  OS_CFG_IDLE_TASK_STK_SIZE                        64u
+#define  OS_CFG_IDLE_TASK_STK_SIZE                        2048u
 
 
                                                                 /* ------------------ STATISTIC TASK ------------------ */
@@ -52,7 +52,7 @@
                                                                 /* Rate of execution (1 to 10 Hz)                       */
 #define  OS_CFG_STAT_TASK_RATE_HZ                         10u
                                                                 /* Stack size (number of CPU_STK elements)              */
-#define  OS_CFG_STAT_TASK_STK_SIZE                       100u
+#define  OS_CFG_STAT_TASK_STK_SIZE                       2048u
 
 
                                                                 /* ---------------------- TICKS ----------------------- */
@@ -64,7 +64,7 @@
                                                                 /* Priority of 'Timer Task'                             */
 #define  OS_CFG_TMR_TASK_PRIO   ((OS_PRIO)(OS_CFG_PRIO_MAX-3u))
                                                                 /* Stack size (number of CPU_STK elements)              */
-#define  OS_CFG_TMR_TASK_STK_SIZE                        128u
+#define  OS_CFG_TMR_TASK_STK_SIZE                        2048u
 
                                                                 /* DEPRECATED - Rate for timers (10 Hz Typ.)            */
                                                                 /* The timer task now calculates its timeouts based     */

@@ -13,7 +13,7 @@ extern void Software_IRQHandler(void);
 
 static void nextcmp()
 {
-    uint32 cpu_id = r_mhartid();
+    uint64 cpu_id = r_mhartid();
     //设置间隔位8000000个周期
     //qemu 中一个周期是1ps 约等于8ms
     uint64 intervel = 1000000;
@@ -22,9 +22,9 @@ static void nextcmp()
     *(uint64 *)CLINT_TIMECMP(cpu_id)=x;
 }
 
-#define INT_BIT 0x80000000
+#define INT_BIT 0x8000000000000000ull
 
-void trap_handler(uint32 mcause,uint32 mtval,uint32 sp)
+void trap_handler(uint64 mcause,uint64 mtval,uint64 sp)
 {
      if(mcause &INT_BIT)
      {
@@ -35,7 +35,7 @@ void trap_handler(uint32 mcause,uint32 mtval,uint32 sp)
             // printf("timer!");
             nextcmp();            
 	        OSTimeTick();
-            uint32 mstatus = r_mstatus();
+            uint64 mstatus = r_mstatus();
             mstatus |= MPIE;
             mstatus = mstatus| MPP_M;
             w_mstatus(mstatus);
@@ -43,18 +43,17 @@ void trap_handler(uint32 mcause,uint32 mtval,uint32 sp)
         }
         else if(mcause ==1)
         {
-            uint32 mstatus = r_mstatus();
+            uint64 mstatus = r_mstatus();
             mstatus |= MPIE;
             mstatus = mstatus| MPP_M;
             w_mstatus(mstatus);
-            asm volatile("add a2,%0,zero"::"r"(sp):"a2");
+            __asm__ __volatile__("add a2,%0,zero"::"r"(sp):"a2");
             Software_IRQHandler();
         }
         else panic("error");
      }
      else
      {
-        
         panic("exception");
      }
 
@@ -62,7 +61,7 @@ void trap_handler(uint32 mcause,uint32 mtval,uint32 sp)
 
 void timer_init()
 {
-    uint32 cpu_id = r_mhartid();
+    uint64 cpu_id = r_mhartid();
     //设置间隔位8000000个周期
     //qemu 中一个周期是1ps 约等于8ms
     uint64 intervel = 1000000;
@@ -71,8 +70,8 @@ void timer_init()
     *(uint64 *)CLINT_TIMECMP(cpu_id)=x;
     w_mie(r_mie()| MEIE | MTIE | MSIE |SSIE);
     w_mstatus((r_mstatus()&(~MPIE))|MPP_M);
-    w_mepc((uint32)main);
-    asm volatile("mret");
+    w_mepc((uint64)main);
+    __asm__ __volatile__("mret");
 }
 
 void bsp_init()
@@ -80,7 +79,7 @@ void bsp_init()
     w_satp(0);
     uart_init();
     printf("booting!\n");
-    w_mtvec((uint32)trap_entry);
+    w_mtvec((uint64)trap_entry);
     timer_init();
     while(1) ;
 }

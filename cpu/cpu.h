@@ -156,8 +156,8 @@ typedef            void      (*CPU_FNCT_PTR )(void *p_obj);     /* See Note #2b.
 *********************************************************************************************************
 */
                                                                 /* Define  CPU         word sizes (see Note #1) :       */
-#define  CPU_CFG_ADDR_SIZE              CPU_WORD_SIZE_32        /* Defines CPU address word size  (in octets).          */
-#define  CPU_CFG_DATA_SIZE              CPU_WORD_SIZE_32        /* Defines CPU data    word size  (in octets).          */
+#define  CPU_CFG_ADDR_SIZE              CPU_WORD_SIZE_64        /* Defines CPU address word size  (in octets).          */
+#define  CPU_CFG_DATA_SIZE              CPU_WORD_SIZE_64        /* Defines CPU data    word size  (in octets).          */
 #define  CPU_CFG_DATA_SIZE_MAX          CPU_WORD_SIZE_64        /* Defines CPU maximum word size  (in octets).          */
 
 #define  CPU_CFG_ENDIAN_TYPE            CPU_ENDIAN_TYPE_LITTLE  /* Defines CPU data    word-memory order (see Note #2). */
@@ -215,7 +215,7 @@ typedef  CPU_ADDR    CPU_SIZE_T;                                /* Defines CPU s
 
 #define  CPU_CFG_STK_ALIGN_BYTES  (sizeof(CPU_ALIGN))           /* Defines CPU stack alignment in bytes. (see Note #2). */
 
-typedef  CPU_INT32U               CPU_STK;                      /* Defines CPU stack data type.                         */
+typedef  CPU_INT64U               CPU_STK;                      /* Defines CPU stack data type.                         */
 typedef  CPU_ADDR                 CPU_STK_SIZE;                 /* Defines CPU stack size data type.                    */
 
 
@@ -293,7 +293,7 @@ typedef  CPU_ADDR                 CPU_STK_SIZE;                 /* Defines CPU s
                                                                 /* Configure CPU critical method      (see Note #1) :   */
 #define  CPU_CFG_CRITICAL_METHOD    CPU_CRITICAL_METHOD_STATUS_LOCAL
 
-typedef  CPU_INT32U                 CPU_SR;                     /* Defines   CPU status register size (see Note #3b).   */
+typedef  CPU_INT64U                 CPU_SR;                     /* Defines   CPU status register size (see Note #3b).   */
 
                                                                 /* Allocates CPU status register word (see Note #3a).   */
 #if     (CPU_CFG_CRITICAL_METHOD == CPU_CRITICAL_METHOD_STATUS_LOCAL)
@@ -341,9 +341,9 @@ typedef  CPU_INT32U                 CPU_SR;                     /* Defines   CPU
 *********************************************************************************************************
 */
 
-#define  CPU_MB()
-#define  CPU_RMB()
-#define  CPU_WMB()
+#define  CPU_MB()       __asm__ __volatile__("":::"memory");
+#define  CPU_RMB()      __asm__ __volatile__("":::"memory");
+#define  CPU_WMB()      __asm__ __volatile__("":::"memory");
 
 
 /*
