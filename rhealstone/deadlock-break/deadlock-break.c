@@ -4,22 +4,15 @@
  * This file's license is 2-clause BSD as in this distribution's LICENSE file.
  */
 
-#include <prt_task.h>
-#include <prt_sem.h>
-#include <prt_sys.h>
-#include <prt_clk.h>
+#include "adaptor.h"
+#include "os.h"
+#include "cpu_core.h"
 
 extern void benchmark_timer_initialize(void);
-extern uintptr_t benchmark_timer_read(void);
-extern int PRT_Printf(char* str, ...); 
+extern uint64 benchmark_timer_read(void);
+
+
 #define rtems_test_assert(x) 
-#define put_time( _message, _total_time, \
-                  _iterations, _loop_overhead, _overhead ) \
-    PRT_Printf( \
-      "%s - %d cycle\n", \
-      (_message), \
-      (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead) \
-    )
 #define trans( _total_time, \
             _iterations, _loop_overhead, _overhead )    \
     (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead)
@@ -27,8 +20,19 @@ extern int PRT_Printf(char* str, ...);
 #define BENCHMARKS 20000
 #define WARM_UP_TIMES 1000
 
-TskHandle taskIds[3];
-SemHandle semId;
+#define TASK_STK_SIZE       4096
+#define TASK_TSK_PRIO_1     6
+#define TASK_TSK_PRIO_2     7
+#define TASK_TSK_PRIO_3     8
+#define TASK_OPT      (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR)
+
+OS_TCB taskIds[3];
+CPU_STK taskStk_1[TASK_STK_SIZE]__attribute__((aligned(16)));
+CPU_STK taskStk_2[TASK_STK_SIZE]__attribute__((aligned(16)));
+CPU_STK taskStk_3[TASK_STK_SIZE]__attribute__((aligned(16)));
+
+
+OS_SEM semId;
 U32 status;
 U32 count;
 U32 semExe;
@@ -36,34 +40,36 @@ uintptr_t telapsed;
 uintptr_t switchOverhead;
 uintptr_t obtainOverhead;
 
-void Task01(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task01(void* arg)
 {
     /* All tasks have bad time to start up once TA01 is running */
-
+    OS_ERR err;
     /* Benchmark code */
     benchmark_timer_initialize();
     for (count = 0; count < BENCHMARKS; count++) {
         if (semExe == 1) {
             /* Block on call */
-            PRT_SemPend(semId, OS_WAIT_FOREVER);
+            OSSemPend(&semId, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
+            // PRT_SemPend(semId, OS_WAIT_FOREVER);
         }
 
         if (semExe == 1) {
             /* Release semaphore immediately after obtaining it */
-            PRT_SemPost(semId);
+            // PRT_SemPost(semId);
+            OSSemPost(&semId, OS_OPT_POST_1, &err);
         }
 
         /* Suspend self, go to TA02 */
-        PRT_TaskSuspend(taskIds[0]);
+        OSTaskSuspend(&taskIds[0], &err);
     }
     telapsed = benchmark_timer_read();
 
     /* Check which run this was */
     if (semExe == 0) {
         switchOverhead = telapsed;
-        PRT_TaskSuspend(taskIds[1]);
-        PRT_TaskSuspend(taskIds[2]);
-        PRT_TaskSuspend(taskIds[0]);
+        OSTaskSuspend(&taskIds[1], &err);
+        OSTaskSuspend(&taskIds[2], &err);
+        OSTaskSuspend(&taskIds[0], &err);
     } else {
         // put_time (
         //     "Rhealstone: Deadlock Break",
@@ -82,142 +88,231 @@ void Task01(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t para
     }
 }
 
-void Task02(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task02(void* arg)
 {
+    OS_ERR err;
     /* Start up TA01, get preempted */
     if (semExe == 1) {
-        status = PRT_TaskResume(taskIds[0]);
-        PRT_Printf("PRT_TaskResume of TA01 %d\n",status);
+        OSTaskResume(&taskIds[0], &err);
+        // status = PRT_TaskResume(taskIds[0]);
+        // PRT_Printf("PRT_TaskResume of TA01 %d\n",status);
     } else {
-        status = PRT_TaskResume(taskIds[0]);
-        PRT_Printf("PRT_TaskResume of TA01 %d\n",status);
+        OSTaskResume(&taskIds[0], &err);
+        // status = PRT_TaskResume(taskIds[0]);
+        // PRT_Printf("PRT_TaskResume of TA01 %d\n",status);
     }
 
     /* Benchmark code */
     for (; count < BENCHMARKS;) {
         /* Suspend self, go to TA01 */
-        PRT_TaskSuspend(taskIds[1]);
+        // PRT_TaskSuspend(taskIds[1]);
+        OSTaskSuspend(&taskIds[1], &err);
 
         /* Wake up TA01, get preempted */
-        PRT_TaskResume(taskIds[0]);
+        // PRT_TaskResume(taskIds[0]);
+        OSTaskResume(&taskIds[0], &err);
     }
 }
 
-void Task03(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task03(void* arg)
 {
+    OS_ERR err;
     if (semExe == 1) {
         /* Low priority task holds mutex */
-        PRT_SemPend(semId, OS_WAIT_FOREVER);
+        OSSemPend(&semId, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
     }
 
     /* Start up TA02, get preempted */
     if (semExe == 1) {
-        status = PRT_TaskResume(taskIds[1]);
-        PRT_Printf("PRT_TaskResume of TA02 %d\n",status);
+        OSTaskResume(&taskIds[1], &err);
     } else {
-        status = PRT_TaskResume(taskIds[1]);
-        PRT_Printf("PRT_TaskResume of TA02 %d\n",status);
+        OSTaskResume(&taskIds[1], &err);
     }
 
     /* Benchmark code */
     for (; count < BENCHMARKS;) {
         if (semExe == 1) {
             /* Preempted by TA01 upon release */
-            PRT_SemPost(semId);
+            OSSemPost(&semId, OS_OPT_POST_1, &err);
         }
 
         if (semExe == 1) {
             /* Prepare for next Benchmark */
-            PRT_SemPend(semId, OS_WAIT_FOREVER);
+            OSSemPend(&semId, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
         }
         /* Wake up TA02, get preempted */
-        PRT_TaskResume(taskIds[1]);
+        OSTaskResume(&taskIds[1], &err);
     }
 }
 
 void Init(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
 {
-    struct TskInitParam taskParam = { 0 };
-    U32 status;
-    TskHandle selfTaskPid;
+    OS_ERR err;
+    OSSemCreate(&semId, "semphare", 1, &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create semphare failed");
+    PRT_Printf("PRT_SemCreate of S0 %d\n",err);
 
-    status = PRT_SemCreate(1, &semId);
-    PRT_Printf("PRT_SemCreate of S0 %d\n",status);
+    
+    OSTaskCreate((OS_TCB*)      &taskIds[0],           \
+                 (CPU_CHAR*)    "TA01",                \
+                 (OS_TASK_PTR)  Task01,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_1,       \
+                 (CPU_STK *)    &taskStk_1[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task01 failed");
 
-    taskParam.taskEntry = Task01;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA01";
-    taskParam.taskPrio = OS_TSK_PRIORITY_16;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[0], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA01 %d\n",status);
-
-    taskParam.taskEntry = Task02;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA02";
-    taskParam.taskPrio = OS_TSK_PRIORITY_18;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[1], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA02 %d\n",status);
-
-    taskParam.taskEntry = Task03;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA03";
-    taskParam.taskPrio = OS_TSK_PRIORITY_20;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[2], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA03 %d\n",status);
+    OSTaskCreate((OS_TCB*)      &taskIds[1],           \
+                 (CPU_CHAR*)    "TA02",                \
+                 (OS_TASK_PTR)  Task02,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_2,       \
+                 (CPU_STK *)    &taskStk_2[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task02 failed");
+    
+    OSTaskCreate((OS_TCB*)      &taskIds[2],           \
+                 (CPU_CHAR*)    "TA03",                \
+                 (OS_TASK_PTR)  Task03,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_3,       \
+                 (CPU_STK *)    &taskStk_3[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task03 failed");
 
     /* find overhead of obtaining semaphore*/
     for(int i=0;i<WARM_UP_TIMES;i++)
     {
         benchmark_timer_initialize();
-        PRT_SemPend(semId, OS_WAIT_FOREVER);
+        OSSemPend(&semId, 0, OS_OPT_PEND_BLOCKING, NULL, &err);
         obtainOverhead += benchmark_timer_read();
-        PRT_SemPost(semId);
+        OSSemPost(&semId, OS_OPT_POST_1, &err);
     }
     obtainOverhead /= WARM_UP_TIMES;
     PRT_Printf("test time: %ld cyc\n",obtainOverhead);
     
+    OSTaskSuspend(&taskIds[0], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task01 failed");
+    OSTaskSuspend(&taskIds[1], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task02 failed");
+    OSTaskSuspend(&taskIds[2], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task03 failed");
+    
+    OSTaskChangePrio (NULL, TASK_TSK_PRIO_3 + 2, &err);
+    if(err !=OS_ERR_NONE) 
+        panic("change prio failed");
 
-    status = PRT_TaskSelf(&selfTaskPid);
-    PRT_Printf("PRT_TaskSelf %d\n",status);
-    status = PRT_TaskSetPriority(selfTaskPid, OS_TSK_PRIORITY_25);
-    PRT_Printf("PRT_TaskSetPriority %d\n",status);
 
     /* Get time of benchmark with no semaphores involved, i.e. find overhead */
     semExe = 0;
-    status = PRT_TaskResume(taskIds[2]);
-    PRT_Printf("PRT_TaskResume of TA03 %d\n",status);
+    OSTaskResume(&taskIds[2], &err);
 
-    taskParam.taskEntry = Task01;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA01";
-    taskParam.taskPrio = OS_TSK_PRIORITY_16;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[0], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA01 %d\n",status);
+    OSTaskChangePrio (NULL, TASK_TSK_PRIO_1 - 1, &err);
+    if(err !=OS_ERR_NONE) 
+        panic("change prio failed");
+    
+    OSTaskDel(&taskIds[0],&err);
+    if(err !=OS_ERR_NONE) 
+        panic("del task0 error");
+    OSTaskDel(&taskIds[1],&err);
+    if(err !=OS_ERR_NONE) 
+        panic("del task1 error");
+    OSTaskDel(&taskIds[2],&err);
+    if(err !=OS_ERR_NONE) 
+        panic("del task0 error");
+    
+    OSTaskCreate((OS_TCB*)      &taskIds[0],           \
+                 (CPU_CHAR*)    "TA01",                \
+                 (OS_TASK_PTR)  Task01,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_1,       \
+                 (CPU_STK *)    &taskStk_1[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task01 failed");
 
-    taskParam.taskEntry = Task02;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA02";
-    taskParam.taskPrio = OS_TSK_PRIORITY_18;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[1], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA02 %d\n",status);
+    OSTaskCreate((OS_TCB*)      &taskIds[1],           \
+                 (CPU_CHAR*)    "TA02",                \
+                 (OS_TASK_PTR)  Task02,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_2,       \
+                 (CPU_STK *)    &taskStk_2[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task02 failed");
+    
+    OSTaskCreate((OS_TCB*)      &taskIds[2],           \
+                 (CPU_CHAR*)    "TA03",                \
+                 (OS_TASK_PTR)  Task03,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_3,       \
+                 (CPU_STK *)    &taskStk_3[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task03 failed");
 
-    taskParam.taskEntry = Task03;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA03";
-    taskParam.taskPrio = OS_TSK_PRIORITY_20;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[2], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA03 %d\n",status);
+    OSTaskSuspend(&taskIds[0], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task01 failed");
+    OSTaskSuspend(&taskIds[1], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task02 failed");
+    OSTaskSuspend(&taskIds[2], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task03 failed");
+    
+    OSTaskChangePrio (NULL, TASK_TSK_PRIO_3 + 2, &err);
+    if(err !=OS_ERR_NONE) 
+        panic("change prio failed");
+
     /* Get time of benchmark with semaphores */
     semExe = 1;
-    status = PRT_TaskResume(taskIds[2]);
-    PRT_Printf("PRT_TaskResume of TA03 %d\n",status);
-
+    OSTaskResume(&taskIds[2], &err);
+    
     /* Should never reach here*/
     rtems_test_assert(false);
+    panic("error end");
 }

@@ -35,7 +35,29 @@ QEMUFLAGS:=	\
 -nographic	\
 -machine virt
 
-TEST_APPS_OBJS:= $(BUILD)/rhealstone/task-switch/task-switch.o
+TEST_APPS_OBJS:= $(BUILD)/rhealstone/task-switch/task-switch.o 	\
+$(BUILD)/rhealstone/task-preempt/task-preempt.o	\
+$(BUILD)/rhealstone/semaphore-shuffle/semaphore-shuffle.o \
+$(BUILD)/rhealstone/message-latency/message-latency.o	\
+$(BUILD)/rhealstone/deadlock-break/deadlock-break.o
+
+TARGET:=$(APP)
+
+ifeq ($(APP),)
+TARGET:=task-switch
+endif
+
+ifeq ($(TARGET),task-switch)
+TARGET:=$(BUILD)/test_task_switch
+else ifeq ($(TARGET),task-preempt)
+TARGET:=$(BUILD)/test_task_preempt
+else ifeq ($(TARGET),sem-shuffle)
+TARGET:=$(BUILD)/test_sem_shuffle
+else ifeq ($(TARGET),msg-latency)
+TARGET:=$(BUILD)/test_msg_latency
+else ifeq ($(TARGET),dead-lock)
+TARGET:=$(BUILD)/test_dead_lock
+endif
 
 SRFILES:= 	\
 $(SRC)/bsp/boot.s				\
@@ -83,25 +105,43 @@ $(shell find $(SRC) -name "*.c")\
 $(shell find $(SRC) -name "*.s")\
 $(shell find $(SRC) -name "*.S")
 
+compile:$(TARGET)
+	
+$(BUILD)/test_dead_lock: $(SRC)/kernel.ld $(OBJECTS) $(TEST_APPS_OBJS)
+	@mkdir -p $(dir $@)
+	$(LD) $(LDFLAGS) -T $< $(OBJECTS) $(BUILD)/rhealstone/deadlock-break/deadlock-break.o -o $@
+
+$(BUILD)/test_msg_latency: $(SRC)/kernel.ld $(OBJECTS) $(TEST_APPS_OBJS)
+	@mkdir -p $(dir $@)
+	$(LD) $(LDFLAGS) -T $< $(OBJECTS) $(BUILD)/rhealstone/message-latency/message-latency.o -o $@
+
+$(BUILD)/test_sem_shuffle: $(SRC)/kernel.ld $(OBJECTS) $(TEST_APPS_OBJS)
+	@mkdir -p $(dir $@)
+	$(LD) $(LDFLAGS) -T $< $(OBJECTS) $(BUILD)/rhealstone/semaphore-shuffle/semaphore-shuffle.o -o $@
+
 $(BUILD)/test_task_switch: $(SRC)/kernel.ld $(OBJECTS) $(TEST_APPS_OBJS)
 	@mkdir -p $(dir $@)
 	$(LD) $(LDFLAGS) -T $< $(OBJECTS) $(BUILD)/rhealstone/task-switch/task-switch.o -o $@
 
-qemu:$(BUILD)/test_task_switch \
+$(BUILD)/test_task_preempt: $(SRC)/kernel.ld $(OBJECTS) $(TEST_APPS_OBJS)
+	@mkdir -p $(dir $@)
+	$(LD) $(LDFLAGS) -T $< $(OBJECTS) $(BUILD)/rhealstone/task-preempt/task-preempt.o -o $@
+
+qemu:$(TARGET) \
 	$(BUILD)/kernel.asm\
 	$(BUILD)/kernel.map
 	$(QEMU) $(QEMUFLAGS) -kernel $< 
 
-qemuDbg:$(BUILD)/test_task_switch \
+qemuDbg:$(TARGET) \
 	$(BUILD)/kernel.asm\
 	$(BUILD)/kernel.map
 	$(QEMU) $(QEMUFLAGS) -kernel $< -s -S 
 
-$(BUILD)/kernel.asm: $(BUILD)/test_task_switch
+$(BUILD)/kernel.asm: $(TARGET)
 	@mkdir -p $(dir $@)
 	$(OBJDUMP) -d $< > $@
 
-$(BUILD)/kernel.map: $(BUILD)/test_task_switch
+$(BUILD)/kernel.map: $(TARGET)
 	@mkdir -p $(dir $@)
 	$(NM)  $<  |sort >$@
 
@@ -145,5 +185,7 @@ $(BUILD)/%.o:$(SRC)/%.c
 clean:
 	rm -rf $(BUILD)
 debug:
-	@echo $(CCFLAGS) 
+	@echo $(MAKECMDGOALS)
+	@echo $(APP)
+	@echo $(TARGET)
 .PHONY:clean debug compile qemu qemuDbg

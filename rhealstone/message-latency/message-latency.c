@@ -4,29 +4,17 @@
  * This file's license is 2-clause BSD as in this distribution's LICENSE file.
  */
 
-// #include "tmacros.h"
-// #include "timesys.h"
-#include <prt_task.h>
-#include <prt_sem.h>
-#include <prt_sys.h>
-#include <prt_queue.h>
-#include <prt_clk.h>
+#include "adaptor.h"
+#include "os.h"
+#include "cpu_core.h"
 
 extern void benchmark_timer_initialize(void);
-extern uintptr_t benchmark_timer_read(void);
-extern int PRT_Printf(char* str, ...); 
+extern uint64 benchmark_timer_read(void);
+
 #define rtems_test_assert(x) 
-#define put_time( _message, _total_time, \
-                  _iterations, _loop_overhead, _overhead ) \
-    PRT_Printf( \
-      "%s - %d cycle\n", \
-      (_message), \
-      (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead) \
-    )
 #define trans( _total_time, \
             _iterations, _loop_overhead, _overhead )    \
     (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead)
-
 
 #define MESSAGE_SIZE (sizeof(long) * 4)
 #define BENCHMARKS      100000      
@@ -36,49 +24,68 @@ uintptr_t telapsed;
 uintptr_t tloopOverhead;
 uintptr_t treceiveOverhead;
 U32 count;
-TskHandle taskIds[2];
-U32 queueId;
+#define TASK_STK_SIZE       4096
+#define TASK_TSK_PRIO       4
+#define TASK_OPT      (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR)
+OS_TCB taskIds[2];
+CPU_STK taskStk_1[TASK_STK_SIZE]__attribute__((aligned(16)));
+CPU_STK taskStk_2[TASK_STK_SIZE]__attribute__((aligned(16)));
+
+OS_Q queueId;
 long messageBuffer[4];
 
-void Task01(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task01(void* args)
 {
-    U32 status;
+    OS_ERR err;
     size_t size;
     for(int i=0; i<WARM_UP_TIMES; i++) {
-        (void)PRT_QueueWrite(queueId, messageBuffer, MESSAGE_SIZE, OS_WAIT_FOREVER, OS_QUEUE_NORMAL);
-        (void)PRT_QueueRead(queueId, messageBuffer, &size, OS_WAIT_FOREVER);
+        OSQPost(&queueId, messageBuffer, MESSAGE_SIZE, OS_OPT_POST_FIFO, &err);
+        OSQPend(&queueId, 0, OS_OPT_PEND_BLOCKING, &size, NULL, &err);
     }
 
     /* Put a message in the queue so recieve overhead can be found. */
-    (void)PRT_QueueWrite(queueId, messageBuffer, MESSAGE_SIZE, OS_WAIT_FOREVER, OS_QUEUE_NORMAL);
+    OSQPost(&queueId, messageBuffer, MESSAGE_SIZE, OS_OPT_POST_FIFO, &err);
     /* status up second task, get preempted */
-    status = PRT_TaskResume(taskIds[1]);
+    OSTaskResume(&(taskIds[1]),&err);
     //PRT_Printf("PRT_TaskResume %d\n",status);
 
-    for ( ; count < BENCHMARKS; count++) {
-        (void)PRT_QueueWrite(queueId, messageBuffer, MESSAGE_SIZE, OS_WAIT_FOREVER, OS_QUEUE_NORMAL);
+    for ( int i =0 ; i < BENCHMARKS; i++) {
+        OSQPost(&queueId, messageBuffer, MESSAGE_SIZE, OS_OPT_POST_FIFO, &err);
     }
 
     /* should never reach here */
     rtems_test_assert(false);
+    panic("err end");
 }
 
-void Task02(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task02(void* args)
 {
     size_t size = MESSAGE_SIZE;
-    U32 status;
+    OS_ERR err;
 
 
     /* find recieve overhead - no preempt or task switch */
+    for(int i=0; i<WARM_UP_TIMES -1 ; i++) {
+        benchmark_timer_initialize();
+        size = MESSAGE_SIZE;
+        OSQPend(&queueId, 0, OS_OPT_PEND_BLOCKING, &size, NULL, &err);
+        treceiveOverhead += benchmark_timer_read();
+        OSQPost(&queueId, messageBuffer, MESSAGE_SIZE, OS_OPT_POST_FIFO, &err);
+    }
+    
+    
     benchmark_timer_initialize();
     size = MESSAGE_SIZE;
-    (void)PRT_QueueRead(queueId, messageBuffer, &size, OS_WAIT_FOREVER);
-    treceiveOverhead = benchmark_timer_read();
+    OSQPend(&queueId, 0, OS_OPT_PEND_BLOCKING, &size, NULL, &err);
+    treceiveOverhead += benchmark_timer_read();
+
+    treceiveOverhead /= WARM_UP_TIMES;
+
     /* Benchmark code */
     benchmark_timer_initialize();
-    for (int count = 0; count < BENCHMARKS - 1; count++) {
+    for (int i = 0; i < BENCHMARKS - 1; i++) {
         size = MESSAGE_SIZE;
-        (void)PRT_QueueRead(queueId, messageBuffer, &size, OS_WAIT_FOREVER);
+        OSQPend(&queueId, 0, OS_OPT_PEND_BLOCKING, &size, NULL, &err);
     }
     telapsed = benchmark_timer_read();
     PRT_Printf("tsk used total cycle    : %ld cyc\n",telapsed);
@@ -101,41 +108,58 @@ void Task02(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t para
     PRT_SysReboot();
 }
 
-void Init(uintptr_t paraml, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Init(void* arg)
 {
-    struct TskInitParam taskParam = {0};
-    U32 status;
+    OS_ERR err;
+    OSQCreate(&queueId, "msg_queue", 1000, &err);
+    PRT_Printf("message_queue_create %d\n",err);
+    if(err !=OS_ERR_NONE) 
+        panic("msg create fail");
 
-    status = PRT_QueueCreate(1, MESSAGE_SIZE, &queueId);
-    PRT_Printf("message_queue_create %d\n",status);
+    OSTaskCreate((OS_TCB*)      &taskIds[0],           \
+                 (CPU_CHAR*)    "TA01",                \
+                 (OS_TASK_PTR)  Task01,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO+1,       \
+                 (CPU_STK *)    &taskStk_1[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task01 failed");
 
-    taskParam.taskEntry = Task01;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA01";
-    taskParam.taskPrio = OS_TSK_PRIORITY_20;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[0], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA01 %d\n",status);
-
-    taskParam.taskEntry = Task02;
-    taskParam.stackSize = 0x800;
-    taskParam.name = "TA02";
-    taskParam.taskPrio = OS_TSK_PRIORITY_18;
-    taskParam.stackAddr = 0;
-    status = PRT_TaskCreate(&taskIds[1], &taskParam);
-    PRT_Printf("PRT_TaskCreate of TA02 %d\n",status);
+    OSTaskCreate((OS_TCB*)      &taskIds[1],           \
+                 (CPU_CHAR*)    "TA02",                \
+                 (OS_TASK_PTR)  Task02,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO-1,       \
+                 (CPU_STK *)    &taskStk_2[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task02 failed");
 
     benchmark_timer_initialize();
     for (int i = 0; i < BENCHMARKS - 1; i++) {
         __asm__ __volatile__("");
     }
     tloopOverhead = benchmark_timer_read();
+   
+    OSTaskSuspend(&taskIds[1], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task02 failed");
 
-    status = PRT_TaskResume(taskIds[0]);
-    PRT_Printf("PRT_TaskResume of TA01 %d\n",status);
-
-    TskHandle selfTaskId;
-    PRT_TaskSelf(&selfTaskId);
-    status = PRT_TaskDelete(selfTaskId);
-    PRT_Printf("PRT_TaskDelete of SELF %d\n",status);
+    OSTaskDel(NULL, &err);
+    
+    PRT_Printf("PRT_TaskDelete of INIT ERROR\n");
+    panic("error in del\n");
 }

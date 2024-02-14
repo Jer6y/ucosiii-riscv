@@ -4,63 +4,66 @@
  * This file's license is 2-clause BSD as in this distribution's LICENSE file.
  */
 
-#include <prt_task.h>
-#include <prt_sys.h>
-#include <prt_clk.h>
-
+#include "adaptor.h"
+#include "os.h"
+#include "cpu_core.h"
+#define WARMUP_TIMES 5000
 
 extern void benchmark_timer_initialize(void);
-extern uintptr_t benchmark_timer_read(void);
-extern int PRT_Printf(char* str, ...); 
-#define rtems_test_assert(x) 
-#define put_time( _message, _total_time, \
-                  _iterations, _loop_overhead, _overhead ) \
-    PRT_Printf( \
-      "%s - %d cycle\n", \
-      (_message), \
-      (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead) \
-    )
+extern uint64 benchmark_timer_read(void);
 
+#define rtems_test_assert(x) 
 #define trans( _total_time, \
             _iterations, _loop_overhead, _overhead )    \
     (((_total_time) - (_loop_overhead)) / (_iterations)) - (_overhead)
 
 #define BENCHMARKS 50000
-#define WARMUP_TIMES 100
 
-TskHandle taskIds[2];
+#define TASK_STK_SIZE       4096
+#define TASK_TSK_PRIO_1     8
+#define TASK_TSK_PRIO_2     5
+#define TASK_OPT      (OS_OPT_TASK_STK_CHK | OS_OPT_TASK_STK_CLR)
+
+OS_TCB taskIds[2];
+CPU_STK taskStk_1[TASK_STK_SIZE]__attribute__((aligned(16)));
+CPU_STK taskStk_2[TASK_STK_SIZE]__attribute__((aligned(16)));
+
 uintptr_t telapsed;
 uintptr_t tloop;
 uintptr_t tswitch;
 U32 count, count1;
-U32 status;
 
-void Task01(uintptr_t param1, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task01(void* arg)
 {
+    OS_ERR err;
     for (count = 0; count < WARMUP_TIMES; count++) {
-        status = PRT_TaskResume(taskIds[1]);
-        tswitch = benchmark_timer_read();
-        PRT_Printf("PRT_TaskResume of TA02");
+        OSTaskResume(&(taskIds[1]),&err);
+        tswitch += benchmark_timer_read();
+        //PRT_Printf("PRT_TaskResume of TA02");
     }
-    PRT_Printf("\n\n\n");
+    tswitch /= WARMUP_TIMES;
+    PRT_Printf("warm-up end\n");
     benchmark_timer_initialize();
 
     for (count = 0; count < BENCHMARKS; count++) {
-        PRT_TaskResume(taskIds[1]);
+        OSTaskResume(&(taskIds[1]),&err);
     }
 
+    panic("assert");
     rtems_test_assert(false);
 }
 
-void Task02(uintptr_t param1, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Task02(void* arg)
 {
+    OS_ERR err;
+
     for (count1 = 0; count1 < WARMUP_TIMES; count1++) {
         benchmark_timer_initialize();
-        PRT_TaskSuspend(taskIds[1]);
+        OSTaskSuspend(&taskIds[1], &err);
     }
 
     for (; count < BENCHMARKS - 1;) {
-        PRT_TaskSuspend(taskIds[1]);
+        OSTaskSuspend(&taskIds[1], &err);
     }
 
     telapsed = benchmark_timer_read();
@@ -82,27 +85,40 @@ void Task02(uintptr_t param1, uintptr_t param2, uintptr_t param3, uintptr_t para
     PRT_SysReboot();
 }
 
-void Init(uintptr_t param1, uintptr_t param2, uintptr_t param3, uintptr_t param4)
+void Init(void* arg)
 {
-    struct TskInitParam param = { 0 };
-
-    param.taskEntry = (TskEntryFunc)Task01;
-    param.stackSize = 0x800;
-    param.name = "TA01";
-    param.taskPrio = OS_TSK_PRIORITY_08;
-    param.stackAddr = 0;
-
-    status = PRT_TaskCreate(&taskIds[0], &param);
-    PRT_Printf("PRT_TaskCreate of TA01");
-
-    param.taskEntry = (TskEntryFunc)Task02;
-    param.stackSize = 0x0800;
-    param.name = "TA02";
-    param.taskPrio = OS_TSK_PRIORITY_05;
-    param.stackAddr = 0;
-
-    status = PRT_TaskCreate(&taskIds[1], &param);
-    PRT_Printf("PRT_TaskCreate of TA02");
+    OS_ERR err;
+    OSTaskCreate((OS_TCB*)      &taskIds[0],           \
+                 (CPU_CHAR*)    "TA01",                \
+                 (OS_TASK_PTR)  Task01,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_1,       \
+                 (CPU_STK *)    &taskStk_1[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task01 failed");
+    
+    OSTaskCreate((OS_TCB*)      &taskIds[1],           \
+                 (CPU_CHAR*)    "TA02",                \
+                 (OS_TASK_PTR)  Task02,                \
+                 (void*)        NULL,                  \
+                 (OS_PRIO)      TASK_TSK_PRIO_2,       \
+                 (CPU_STK *)    &taskStk_2[0],         \
+                 (CPU_STK_SIZE) TASK_STK_SIZE/10,      \
+                 (CPU_STK_SIZE) TASK_STK_SIZE,         \
+                 (OS_MSG_QTY)   0,                     \
+                 (OS_TICK)      100000,                \
+                 (void*)        NULL,                  \
+                 (OS_OPT)       TASK_OPT,              \
+                 &err);
+    if(err !=OS_ERR_NONE) 
+        panic("create task02 failed");
 
     benchmark_timer_initialize();
     for (count = 0; count < (BENCHMARKS * 2) - 1; count++) {
@@ -110,11 +126,14 @@ void Init(uintptr_t param1, uintptr_t param2, uintptr_t param3, uintptr_t param4
     }
     tloop = benchmark_timer_read();
 
-    status = PRT_TaskResume(taskIds[0]);
+    OSTaskSuspend(&taskIds[1], &err);
+    if(err !=OS_ERR_NONE) 
+        panic("suspend task02 failed");
+
     PRT_Printf("PRT_TaskResume of TA01");
 
-    TskHandle taskId;
-    PRT_TaskSelf(&taskId);
-    status = PRT_TaskDelete(taskId);
-    PRT_Printf("PRT_TaskDelete of INIT");
+    OSTaskDel(NULL, &err);
+    
+    PRT_Printf("PRT_TaskDelete of INIT ERROR\n");
+    panic("error in del\n");
 }
