@@ -226,11 +226,53 @@
 
     - 目前 ucosiii on riscv64 支持 rhealstone , 使用 makefile 传入参数选择需要编译测试的APP
     - 默认make 编译的是 task-switch 上下文性能测试的APP
-      - **上下文切换性能测试**			[√]
-      - **任务抢占性能测试**
-      - **信号量混洗性能测试**
-      - **消息队列延迟性能测试**
-      - **中断性能测试**
-      - **死锁解除性能测试**
+      - **上下文切换性能测试**			【👆】
+      - **任务抢占性能测试**                            【👆】
+      - **信号量混洗性能测试**                        【👆】
+      - **消息队列延迟性能测试**                    【👆】
+      - **中断性能测试**                                   【👇】
+      - **死锁解除性能测试**                           【👆】
     - **上下文切换性能测试**
+    
+      - ```shell
+        make APP=task-switch qemu
+        ```
+    
+        
+    
       - ![image](https://github.com/Jer6y/ucos_on_qemu-virt_rv32/assets/88422053/7bb089fe-7d5b-43b1-b092-b2aa31ec5219)
+    - **任务抢占性能测试** 
+    
+      - ```shell
+        make APP=task-preempt qemu
+        ```
+    
+      - ![](pic/premt.png)
+    - **信号量混洗性能测试** 
+    
+      - ```shell
+        make APP=sem-shuffle qemu
+        ```
+    
+      - ![](pic/sem_shuffle.png)
+    - **消息队列延迟性能测试** 
+    
+      - ```shell
+        make APP=msg-latency qemu
+        ```
+    
+      - ![](pic/msg_latency.png)
+    - **死锁解除性能测试** 
+    
+      - ```shell
+        make APP=dead-lock qemu
+        ```
+    
+      - ![](pic/dead-lock.png)
+    - **中断性能测试**           
+    
+      - ```
+        
+        ```
+    
+        
